@@ -61,10 +61,10 @@ impl Body {
     pub fn plus_explosion(&self, divisions: i32, force_base: f64) -> Body {
         let theta = Math::random() * std::f64::consts::PI * 2.;
         let u = Math::random(); // uniform random. we'll modify the distribution in `r`
-        let r = -(u - 1.) * (u - 1.) + 1.; // dude this distribution is FUCKING AMAZING
-                                           // I LOVE IT
-                                           // the fireworks become so much ROUNDER AND STUFF
-                                           // BEAUTIFUL
+        let r = (u - 1.) * (u - 1.) * (u - 1.) + 1.; // dude this distribution is FUCKING AMAZING
+                                                     // I LOVE IT
+                                                     // the fireworks become so much ROUNDER AND STUFF
+                                                     // BEAUTIFUL
         let force = r * force_base;
         Body { 
             vx: theta.cos() * force + self.vx * 0.2,
