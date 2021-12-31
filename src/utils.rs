@@ -38,10 +38,15 @@ pub struct HSL(pub f64, pub f64, pub f64);
 use std::fmt;
 impl fmt::Display for HSL {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "hsl({:.2}, {}%, {}%)", self.0, self.1, self.2)
+        write!(f, "hsl({:.2},{}%,{}%)", self.0, self.1, self.2)
     }
 }
 
 pub fn random_color() -> HSL {
     HSL(Math::random() * 360., 75., 80.)
+}
+
+pub fn choose_from<T>(a: &[T]) -> &T {
+    let i = (Math::random() * a.len() as f64).floor() as usize;
+    &a[i]
 }

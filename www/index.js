@@ -23,13 +23,35 @@ window['world'] = world;
 
 ////////////////////////////////////////////////////////////////////
 
+let calls = 0;
+let time = 0;
+let history = [];
+function measure(fn) {
+	const before = performance.now();
+	fn();
+	const after = performance.now();
+	calls++;
+	time += after - before;
+
+	if (calls == 360) {
+		history.push(time / calls);
+		calls = 0;
+		time = 0;
+	}
+}
+
+window['measureHistory'] = history;
+
+////////////////////////////////////////////////////////////////////
+
 let focused = true;
 let lastTime = performance.now();
 const loop = () => {
 	const now = performance.now();
 	const dt = (now - lastTime) / 1000;
 
-	world.loopity_loop(now, dt);
+	measure(() => world.loopity_loop(now, dt));
+	// world.loopity_loop(now, dt);
 
 	lastTime = performance.now();
 	if (focused)
