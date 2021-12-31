@@ -1,8 +1,10 @@
-mod utils;
+pub mod utils;
 use utils::{HSL, random_color};
 
 mod components;
-use components::{Body, Behaviour};
+use components::{Body, Behaviour, LerperInfo};
+
+mod font;
 
 use wasm_bindgen::prelude::*;
 use web_sys::{CanvasRenderingContext2d, console};
@@ -22,6 +24,8 @@ pub struct World {
     bodies: Vec<Body>,
     behaviours: Vec<Behaviour>,
     fuses: BTreeSet<(u64, u32)>, // (timestamp, entity id)
+
+    countdown: i32,
 }
 
 #[wasm_bindgen]
@@ -37,6 +41,7 @@ impl World {
             bodies: Vec::new(),
             behaviours: Vec::new(),
             fuses: BTreeSet::new(),
+            countdown: -1,
         }
     }
 
@@ -71,10 +76,7 @@ impl World {
 
     fn push_random(&mut self, time: u64) {
         use Behaviour::*;
-        let bhv = (*utils::choose_from(&[
-            Chris, MultiColorChris, Crosette, Pistil, Strobe, Peony, Willow,
-            Comet((Math::random() * 45. + 20.).floor() as i32),
-        ])).clone();
+        let bhv = components::random_behaviour();
         let fuse = match bhv {
             Comet(_) => 0u64, // just emit a particle as soon as possible, then `handle_fuse_event` will get the timing right
             _ => (1_000_000. * (1. + Math::random())).floor() as u64, // 1-2s fuse
@@ -277,6 +279,22 @@ impl World {
                     None
                 }
             }
+
+            UserLerper(_) => {
+                // immediately fuses
+                self.fuses.insert((0, id));
+                Some(components::random_behaviour())
+            }
+
+            Lerper(_) => {
+                // transforms into one exploded particle
+                let force = Math::random() * 300. + 400.;
+                let fuse = time + (1000000. * (Math::random() + 0.5)) as u64;
+                self.bodies[i] = self.bodies[i].plus_explosion(1, force);
+                self.bodies[i].r = 0.9;
+                self.fuses.insert((fuse, id));
+                Some(Particle)
+            }
         };
 
         match new_behaviour {
@@ -300,7 +318,7 @@ impl World {
     }
 
     fn update(&mut self, time: u64, dt: f64) {
-        if Math::random() < 0.06 {
+        if self.countdown == 0 && Math::random() < 0.06 {
             self.push_random(time);
         }
 
@@ -327,5 +345,85 @@ impl World {
         let time = (time * 1000.).floor() as u64; // and now time is in microsseconds
         self.update(time, dt);
         self.draw();
+    }
+
+    pub fn update_countdown(&mut self, time: f64, seconds: f64) {
+        let seconds = (seconds.round() as i32).max(0);
+        if self.countdown == seconds {
+            return; // nothing's changed
+        }
+
+        self.countdown = seconds;
+
+        let s = seconds % 60;
+        let m = (seconds / 60) % 60;
+        let h = seconds / 60 / 60;
+
+        let mut text = font::Text::new();
+        if seconds == 0 {
+            text.push(2)
+                .push(0)
+                .push(2)
+                .push(2);
+        } else if seconds < 10 {
+            text.push(s);
+        } else {
+            if h > 0 {
+                text.push(h / 10)
+                    .push(h % 10)
+                    .push(10); // :
+            }
+            if m > 0 || h > 0 {
+                text.push(m / 10)
+                    .push(m % 10)
+                    .push(10); // :
+            }
+            if s > 0 || m > 0 || h > 0 {
+                text.push(s / 10)
+                    .push(s % 10);
+            }
+        }
+
+        let points = text
+            .scale(128.)
+            .center(font::Point::new(self.width / 2., self.height / 2.))
+            .build();
+
+        for p in points {
+            self.push_lerper(time, p.x, p.y, false);
+        }
+    }
+
+    pub fn push_lerper(&mut self, time: f64, tx: f64, ty: f64, user: bool) {
+        let (fuse, ix, iy, r);
+        if user {
+            fuse = Math::random() * 0.5 + 0.75;
+            ix = Math::random() * self.width;
+            r = Math::random() * 0.7 + 1.;
+        } else {
+            fuse = 1.;
+            ix = self.width / 2.;
+            r = 2.;
+        }
+
+        iy = self.height + 2.;
+
+        let it = (time * 1_000.).floor() as u64;
+        let tt = it + (fuse * 1_000_000.).floor() as u64;
+        let info = LerperInfo::boxed(ix, iy, it, tx, ty, tt);
+
+        self.push(
+            Body {
+                x: ix,
+                y: iy,
+                vx: 0.,
+                vy: 0.,
+                m: 1.,
+                r,
+                color: JsValue::from_str(&utils::random_color().to_string()),
+            },
+            if user { Behaviour::UserLerper(info) } else { Behaviour::Lerper(info) },
+            Some(tt),
+        );
     }
 }

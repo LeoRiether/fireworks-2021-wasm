@@ -5,6 +5,11 @@ use js_sys::Math;
 /// Gravity acceleration thingy
 const G: f64 = 500.0;
 
+fn qlerp(from: f64, to: f64, perc: f64) -> f64 {
+    let y = - (perc - 1.) * (perc - 1.) + 1.; // quadratic thingy from 0 to 1
+    from * (1. - y) + to * y // linear lerp
+}
+
 #[derive(Clone)]
 pub struct Body {
     pub x: f64,
@@ -43,6 +48,12 @@ impl Body {
             HueParticle(hue, freq) => {
                 let x = hue + time as f64 / 1_000_000. * 360. * freq;
                 self.color = JsValue::from_str(&format!("hsl({:.2},85%,75%)", x));
+            }
+
+            UserLerper(info) | Lerper(info) => {
+                let p = (time - info.it) as f64 / (info.tt - info.it) as f64;
+                self.x = qlerp(info.ix, info.tx, p);
+                self.y = qlerp(info.iy, info.ty, p);
             }
 
             _ => {}
@@ -108,11 +119,28 @@ impl Body {
     }
 }
 
+#[derive(Clone, Copy)]
+pub struct LerperInfo {
+    pub ix: f64, // i = initial
+    pub iy: f64,
+    pub it: u64,
+    pub tx: f64, // t = target
+    pub ty: f64,
+    pub tt: u64
+}
+
+impl LerperInfo {
+    pub fn boxed(ix: f64, iy: f64, it: u64, tx: f64, ty: f64, tt: u64) -> Box<Self> {
+        Box::new(LerperInfo{ ix, iy, it, tx, ty, tt })
+    }
+}
+
 #[derive(Clone)]
 pub enum Behaviour {
     Particle, // just a body
     HueParticle(f64, f64), // changes hue with time (initial_hue, frequency)
     Glitter(f64), // a body that fades in and out
+
     MassiveParticle, // particle with mass? doesn't have self.velocity *= 0.95 every frame
     Chris, // Chrysanthemus
     MultiColorChris,
@@ -123,5 +151,15 @@ pub enum Behaviour {
     Pistil,
     Peony,
     Strobe,
+
+    Lerper(Box<LerperInfo>), // box because I don't want to make the size of a lerper bigger ¯\_(ツ)_/¯
+    UserLerper(Box<LerperInfo>),
 }
 
+pub fn random_behaviour() -> Behaviour {
+    use Behaviour::*;
+    (*crate::utils::choose_from(&[
+        Chris, MultiColorChris, Crosette, Pistil, Strobe, Peony, Willow,
+        Comet((Math::random() * 45. + 20.).floor() as i32),
+    ])).clone()
+}
