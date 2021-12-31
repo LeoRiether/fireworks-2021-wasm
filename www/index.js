@@ -47,6 +47,8 @@ window['measureHistory'] = history;
 let focused = true;
 let lastTime = performance.now();
 const loop = () => {
+	if (focused)
+		setTimeout(loop, mspf);
 	const now = performance.now();
 	const dt = (now - lastTime) / 1000;
 
@@ -54,8 +56,6 @@ const loop = () => {
 	// world.loopity_loop(now, dt);
 
 	lastTime = performance.now();
-	if (focused)
-		setTimeout(loop, mspf);
 };
 
 window.addEventListener('focus', () => {

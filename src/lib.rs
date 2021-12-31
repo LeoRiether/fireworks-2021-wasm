@@ -2,7 +2,7 @@ mod utils;
 use utils::{HSL, random_color};
 
 mod components;
-use components::{Body, Shape, Behaviour};
+use components::{Body, Behaviour};
 
 use wasm_bindgen::prelude::*;
 use web_sys::{CanvasRenderingContext2d, console};
@@ -20,7 +20,6 @@ pub struct World {
     entity_index: BTreeMap<u32, usize>,
     entity_id: Vec<u32>,
     bodies: Vec<Body>,
-    shapes: Vec<Shape>,
     behaviours: Vec<Behaviour>,
     fuses: BTreeSet<(u64, u32)>, // (timestamp, entity id)
 }
@@ -36,7 +35,6 @@ impl World {
             entity_index: BTreeMap::new(),
             entity_id: Vec::new(),
             bodies: Vec::new(),
-            shapes: Vec::new(),
             behaviours: Vec::new(),
             fuses: BTreeSet::new(),
         }
@@ -50,13 +48,11 @@ impl World {
     fn push(
         &mut self,
         body: Body,
-        shape: Shape,
         behaviour: Behaviour,
         fuse: Option<u64>
     ) -> u32 {
         // insert components
         self.bodies.push(body);
-        self.shapes.push(shape);
         self.behaviours.push(behaviour);
 
         // insert id -> index in the entity_index map
@@ -76,7 +72,7 @@ impl World {
     fn push_random(&mut self, time: u64) {
         use Behaviour::*;
         let bhv = (*utils::choose_from(&[
-            Chris, MultiColorChris, Crosette, Pistil, Strobe,
+            Chris, MultiColorChris, Crosette, Pistil, Strobe, Peony, Willow,
             Comet((Math::random() * 45. + 20.).floor() as i32),
         ])).clone();
         let fuse = match bhv {
@@ -90,12 +86,10 @@ impl World {
                 vx: (Math::random() * 2. - 1.) * self.width / 10.,
                 vy: -Math::random() * 440. - 440.,
                 m: 1.,
-            },
-            Shape {
                 r: match bhv {
-                    Crosette => Math::random() * 2. + 1.,
+                    Crosette => Math::random() * 1.5 + 1.,
                     Comet(_) => Math::random() * 4. + 1.,
-                    _ => Math::random() + 1.,
+                    _ => Math::random() * 0.7 + 1.,
                 },
                 color: JsValue::from_str(&utils::random_color().to_string()),
             },
@@ -115,7 +109,6 @@ impl World {
         }
 
         self.bodies.swap_remove(i);
-        self.shapes.swap_remove(i);
         self.behaviours.swap_remove(i);
         self.entity_id.swap_remove(i);
     }
@@ -128,15 +121,15 @@ impl World {
         use Behaviour::*;
         let old_behaviour = std::mem::replace(&mut self.behaviours[i], Particle);
         let new_behaviour = match old_behaviour {
-            Particle | Glitter(_) => None, // particle's fuse just kills it
+            Particle | Glitter(_) | HueParticle(_, _) | MassiveParticle => None, // particle's fuse just kills it
 
             Chris => { // Chris explodes
                 let n = (Math::random() * 150. + 150.) as i32;
+                let force = Math::random() * 300. + 400.;
                 for _ in 0..n {
                     let fuse = time + (1000000. * (Math::random() + 0.5)) as u64;
                     self.push(
-                        self.bodies[i].plus_explosion(n, Math::random() * 300. + 400.),
-                        self.shapes[i].clone(),
+                        self.bodies[i].plus_explosion(n, force),
                         Behaviour::Particle,
                         Some(fuse),
                     );
@@ -146,15 +139,14 @@ impl World {
 
             MultiColorChris => {
                 let n = (Math::random() * 150. + 150.) as i32;
-                let other_shape = Shape {
-                    r: self.shapes[i].r,
-                    color: JsValue::from_str(&utils::random_color().to_string()),
-                };
+                let colors = [self.bodies[i].color.clone(), JsValue::from_str(&utils::random_color().to_string())];
+                let force = Math::random() * 300. + 400.;
                 for _ in 0..n {
                     let fuse = time + (1000000. * (Math::random() + 0.5)) as u64;
                     self.push(
-                        self.bodies[i].plus_explosion(n, Math::random() * 300. + 400.),
-                        (*utils::choose_from(&[&self.shapes[i], &other_shape])).clone(),
+                        self.bodies[i]
+                            .with_color((*utils::choose_from(&colors)).clone())
+                            .plus_explosion(n, force),
                         Behaviour::Particle,
                         Some(fuse),
                     );
@@ -166,11 +158,41 @@ impl World {
                 let n = (Math::random() * 150. + 150.) as i32;
                 for _ in 0..n {
                     let fuse = time + (1000000. * (Math::random() + 0.5)) as u64;
-                    let phi = 2.0 * std::f64::consts::PI * (Math::random() * 17. + 3.);
+                    let phi = (Math::random() * 6. + 3.) * 2.0 * std::f64::consts::PI;
+                    let force = Math::random() * 300. + 400.;
                     self.push(
-                        self.bodies[i].plus_explosion(n, Math::random() * 300. + 400.),
-                        self.shapes[i].clone(),
+                        self.bodies[i].plus_explosion(n, force),
                         Behaviour::Glitter(phi),
+                        Some(fuse),
+                    );
+                }
+                None
+            }
+
+            Peony => {
+                let n = (Math::random() * 150. + 150.) as i32;
+                let hue = Math::random() * 360.;
+                let freq = Math::random() * 2.5 + 0.5;
+                let force = Math::random() * 300. + 400.;
+                for _ in 0..n {
+                    let fuse = time + (1000000. * (Math::random() + 0.5)) as u64;
+                    self.push(
+                        self.bodies[i].plus_explosion(n, force),
+                        Behaviour::HueParticle(hue, freq),
+                        Some(fuse),
+                    );
+                }
+                None
+            }
+
+            Willow => {
+                let n = (Math::random() * 150. + 150.) as i32;
+                let force = Math::random() * 300. + 400.;
+                for _ in 0..n {
+                    let fuse = time + (1000000. * (Math::random() + 0.5)) as u64;
+                    self.push(
+                        self.bodies[i].plus_willow_explosion(force),
+                        Behaviour::MassiveParticle,
                         Some(fuse),
                     );
                 }
@@ -179,11 +201,11 @@ impl World {
 
             Crosette => {
                 let n = (Math::random() * 20. + 3.) as i32;
+                let force = Math::random() * 150. + 250.;
                 for _ in 0..n {
                     let fuse = time + (1000000. * (Math::random() * 0.5 + 0.5)) as u64;
                     self.push(
-                        self.bodies[i].plus_explosion(n, Math::random() * 150. + 250.),
-                        self.shapes[i].clone(),
+                        self.bodies[i].plus_explosion(n, force),
                         Behaviour::CrosetteBranch,
                         Some(fuse),
                     );
@@ -193,11 +215,11 @@ impl World {
 
             CrosetteBranch => {
                 let n = (Math::random() * 10. + 3.) as i32;
+                let force = Math::random() * 150. + 200.;
                 for _ in 0..n {
                     let fuse = time + (1000000. * (Math::random() + 0.5)) as u64;
                     self.push(
-                        self.bodies[i].plus_directed_explosion(n, Math::random() * 150. + 200.),
-                        self.shapes[i].clone(),
+                        self.bodies[i].plus_directed_explosion(n, force),
                         Behaviour::Particle,
                         Some(fuse),
                     );
@@ -208,28 +230,26 @@ impl World {
             Pistil => {
                 let n = (Math::random() * 150. + 150.) as i32; // outer explosion
                 let m = (Math::random() * 150. + 150.) as i32; // inner explosion
-                let outer_shape = Shape {
-                    r: self.shapes[i].r * 0.5,
-                    color: self.shapes[i].color.clone(),
-                };
+
+                let force = Math::random() * 300. + 500.;
+                let mut body = self.bodies[i].clone();
+                body.r = self.bodies[i].r * 0.5;
                 for _ in 0..n {
                     let fuse = time + (1000000. * (Math::random() + 0.5)) as u64;
                     self.push(
-                        self.bodies[i].plus_explosion(n, Math::random() * 300. + 500.),
-                        outer_shape.clone(),
+                        body.plus_explosion(n, force),
                         Behaviour::Particle,
                         Some(fuse),
                     );
                 }
-                let inner_shape = Shape {
-                    r: self.shapes[i].r + Math::random() * 0.5,
-                    color: JsValue::from_str(&utils::random_color().to_string()),
-                };
+
+                let force = Math::random() * 150. + 150.;
+                body.r = self.bodies[i].r + Math::random() * 0.5;
+                body.color = JsValue::from_str(&utils::random_color().to_string());
                 for _ in 0..m {
                     let fuse = time + (1000000. * (Math::random() + 0.5)) as u64;
                     self.push(
-                        self.bodies[i].plus_explosion(n, Math::random() * 150. + 150.),
-                        inner_shape.clone(),
+                        body.plus_explosion(n, force),
                         Behaviour::Particle,
                         Some(fuse),
                     );
@@ -239,13 +259,11 @@ impl World {
 
             Comet(rem) => {
                 let fuse = time + (500_000. * Math::random() + 500_000.).floor() as u64; // .5-1s fuse
-                let shape = Shape {
-                    r: Math::random() + 0.5,
-                    color: self.shapes[i].color.clone(),
-                };
+                let force = Math::random() * 150. + 100.;
+                let mut body = self.bodies[i].clone();
+                body.r = self.bodies[i].r * 0.5;
                 self.push(
-                    self.bodies[i].plus_explosion(1, Math::random() * 150. + 100.),
-                    shape.clone(),
+                    body.plus_explosion(1, force),
                     Behaviour::Particle,
                     Some(fuse),
                 );
@@ -282,7 +300,7 @@ impl World {
     }
 
     fn update(&mut self, time: u64, dt: f64) {
-        if Math::random() < 0.05 {
+        if Math::random() < 0.06 {
             self.push_random(time);
         }
 
@@ -290,7 +308,7 @@ impl World {
 
         for (body, behaviour) in self.bodies.iter_mut()
                                     .zip(self.behaviours.iter()) {
-            body.update(behaviour, dt);
+            body.update(behaviour, dt, time);
         }
     }
 
@@ -298,9 +316,8 @@ impl World {
         self.ctx.set_fill_style(&JsValue::from_str("rgb(0, 0, 0, 0.2)"));
         self.ctx.fill_rect(0., 0., self.width, self.height);
 
-        for (body, shape) in self.bodies.iter()
-                                .zip(self.shapes.iter()) {
-            shape.draw(&self.ctx, body.x, body.y);
+        for body in self.bodies.iter() {
+            body.draw(&self.ctx);
         }
     }
     

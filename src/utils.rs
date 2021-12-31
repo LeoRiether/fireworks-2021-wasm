@@ -43,7 +43,7 @@ impl fmt::Display for HSL {
 }
 
 pub fn random_color() -> HSL {
-    HSL(Math::random() * 360., 75., 80.)
+    HSL(Math::random() * 360., 85., 75.)
 }
 
 pub fn choose_from<T>(a: &[T]) -> &T {
