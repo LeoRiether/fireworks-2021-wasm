@@ -133,7 +133,7 @@ loop();
 
 ////////////////////////////////////////////////////////////////////
 
-const targetDate = new Date(2022, 0, 1, 0, 0, 0, 0); // why the fuck are months 0-indexed?
+const targetDate = new Date(2023, 0, 1, 0, 0, 0, 0); // why the fuck are months 0-indexed?
 let lastSTo = -1000;
 function update_countdown() {
 	let msTo = targetDate - date();
