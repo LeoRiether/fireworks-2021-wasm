@@ -360,11 +360,12 @@ impl World {
         let h = seconds / 60 / 60;
 
         let mut text = font::Text::new();
+        // TODO: check if this pushes the right digits!
         if seconds == 0 {
             text.push(2)
                 .push(0)
                 .push(2)
-                .push(2);
+                .push(4);
         } else if seconds < 10 {
             text.push(s);
         } else {

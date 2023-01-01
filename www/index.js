@@ -133,6 +133,8 @@ loop();
 
 ////////////////////////////////////////////////////////////////////
 
+// TODO: check if the year is correct (then Ctrl+F "TODO" in lib.rs to correct
+// that as well)
 const targetDate = new Date(2023, 0, 1, 0, 0, 0, 0); // why the fuck are months 0-indexed?
 let lastSTo = -1000;
 function update_countdown() {
